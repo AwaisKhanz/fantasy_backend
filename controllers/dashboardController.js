@@ -73,28 +73,51 @@ exports.getLeagues = async (req, res) => {
                     return null;
                   }
 
-                  const statsData = await fetchPlayerStats(
-                    player.player_key,
-                    accessToken
-                  );
+                  let statsData = {};
+                  try {
+                    statsData = await fetchPlayerStats(
+                      player.player_key,
+                      accessToken
+                    );
+                  } catch (err) {
+                    console.warn(
+                      `Failed to fetch stats for player ${player.player_key}:`,
+                      err
+                    );
+                  }
+
                   const pointsScored =
-                    parseFloat(
-                      statsData?.fantasy_content?.player?.player_stats?.stats?.find(
-                        (s) => s.stat_id === "0"
-                      )?.value
-                    ) || 0;
+                    Array.isArray(
+                      statsData?.fantasy_content?.player?.player_stats?.stats
+                    ) &&
+                    statsData.fantasy_content.player.player_stats.stats.length >
+                      0
+                      ? parseFloat(
+                          statsData.fantasy_content.player.player_stats.stats.find(
+                            (s) => s.stat_id === "0"
+                          )?.value
+                        ) || 0
+                      : 0;
 
-                  const waiverPickups =
-                    transactionsData?.fantasy_content?.league?.transactions?.transaction?.filter(
-                      (t) =>
-                        t?.type === "add" &&
-                        t?.players?.player?.player_id === player.player_id
-                    )?.length || 0;
+                  const waiverPickups = Array.isArray(
+                    transactionsData?.fantasy_content?.league?.transactions
+                      ?.transaction
+                  )
+                    ? transactionsData.fantasy_content.league.transactions.transaction.filter(
+                        (t) =>
+                          t?.type === "add" &&
+                          t?.players?.player?.player_id === player.player_id
+                      )?.length
+                    : 0;
 
-                  const draftRound =
-                    draftData?.fantasy_content?.league?.draft_results?.draft_result?.find(
-                      (d) => d?.player_id === player.player_id
-                    )?.round || null;
+                  const draftRound = Array.isArray(
+                    draftData?.fantasy_content?.league?.draft_results
+                      ?.draft_result
+                  )
+                    ? draftData.fantasy_content.league.draft_results.draft_result.find(
+                        (d) => d?.player_id === player.player_id
+                      )?.round || null
+                    : null;
 
                   const injured = ["INJ", "OUT"].includes(player.status);
 
