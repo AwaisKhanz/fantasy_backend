@@ -30,17 +30,16 @@ exports.getLeagues = async (req, res) => {
           leagueData.leagueKey,
           accessToken
         );
-
         const transactionsData = await fetchLeagueTransactions(
           leagueData.leagueKey,
           accessToken
         );
 
-        const teamsArray = teamsData?.fantasy_content?.league?.teams?.team
-          ? Array.isArray(teamsData.fantasy_content.league.teams.team)
-            ? teamsData.fantasy_content.league.teams.team
-            : [teamsData.fantasy_content.league.teams.team]
-          : [];
+        const teamsArray = Array.isArray(
+          teamsData?.fantasy_content?.league?.teams?.team
+        )
+          ? teamsData.fantasy_content.league.teams.team
+          : [teamsData?.fantasy_content?.league?.teams?.team].filter(Boolean);
 
         const teams = await Promise.all(
           teamsArray.map(async (team) => {
@@ -49,14 +48,13 @@ exports.getLeagues = async (req, res) => {
               accessToken
             );
 
-            const playersArray = rosterData?.fantasy_content?.team?.roster
-              ?.players?.player
-              ? Array.isArray(
-                  rosterData.fantasy_content.team.roster.players.player
-                )
-                ? rosterData.fantasy_content.team.roster.players.player
-                : [rosterData.fantasy_content.team.roster.players.player]
-              : [];
+            const playersArray = Array.isArray(
+              rosterData?.fantasy_content?.team?.roster?.players?.player
+            )
+              ? rosterData.fantasy_content.team.roster.players.player
+              : [
+                  rosterData?.fantasy_content?.team?.roster?.players?.player,
+                ].filter(Boolean);
 
             return {
               teamKey: team.team_key,
@@ -67,7 +65,14 @@ exports.getLeagues = async (req, res) => {
               playoffQualified: team.clinched_playoffs === "1",
               players: await Promise.all(
                 playersArray.map(async (player) => {
-                  // 1. Fetch player stats
+                  if (!player || !player.player_id) {
+                    console.warn(
+                      "Skipped player due to missing player_id:",
+                      player
+                    );
+                    return null;
+                  }
+
                   const statsData = await fetchPlayerStats(
                     player.player_key,
                     accessToken
@@ -79,21 +84,18 @@ exports.getLeagues = async (req, res) => {
                       )?.value
                     ) || 0;
 
-                  // 2. Calculate waiver pickups from transaction data
                   const waiverPickups =
                     transactionsData?.fantasy_content?.league?.transactions?.transaction?.filter(
                       (t) =>
-                        t.type === "add" &&
-                        t.players?.player?.player_id === player.player_id
+                        t?.type === "add" &&
+                        t?.players?.player?.player_id === player.player_id
                     )?.length || 0;
 
-                  // 3. Find draft round from draft data
                   const draftRound =
                     draftData?.fantasy_content?.league?.draft_results?.draft_result?.find(
-                      (d) => d.player_id === player.player_id
+                      (d) => d?.player_id === player.player_id
                     )?.round || null;
 
-                  // 4. Check if the player is injured
                   const injured = ["INJ", "OUT"].includes(player.status);
 
                   return {
@@ -105,23 +107,31 @@ exports.getLeagues = async (req, res) => {
                     injured,
                   };
                 })
-              ),
+              ).then((players) => players.filter(Boolean)), // Remove null entries
             };
           })
         );
 
-        const draftArray = draftData?.fantasy_content?.league?.draft_results
-          ?.draft_result
-          ? Array.isArray(
-              draftData.fantasy_content.league.draft_results.draft_result
-            )
-          : [draftData.fantasy_content.league.draft_results.draft_result];
+        console.log(teams, "teams data from api");
 
-        const draftResults = draftArray?.map((pick) => ({
-          playerId: pick.player_id || "unknown_player_id",
-          name: pick.player_name || "Unknown Player",
-          draftRound: parseInt(pick.round) || null,
-        }));
+        const draftArray = Array.isArray(
+          draftData?.fantasy_content?.league?.draft_results?.draft_result
+        )
+          ? draftData.fantasy_content.league.draft_results.draft_result
+          : [
+              draftData?.fantasy_content?.league?.draft_results?.draft_result,
+            ].filter(Boolean);
+
+        console.log(draftArray, "draftArray from");
+
+        const draftResults =
+          Array.isArray(draftArray) && draftArray.length > 0
+            ? draftArray.map((pick) => ({
+                playerId: pick?.player_id || "unknown_player_id",
+                name: pick?.player_name || "Unknown Player",
+                draftRound: parseInt(pick?.round) || null,
+              }))
+            : [];
 
         if (!league) {
           league = new League({
@@ -146,7 +156,7 @@ exports.getLeagues = async (req, res) => {
 
     return res.status(200).json({ leagues: updatedLeagues });
   } catch (error) {
-    console.error("Error fetching leagues:", error.message);
+    console.error("Error fetching leagues:", error);
     return res.status(500).json({ message: "Failed to fetch leagues." });
   }
 };
