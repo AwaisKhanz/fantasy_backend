@@ -9,13 +9,12 @@ const League = require("../models/League");
 exports.getLeagues = async (req, res) => {
   const { accessToken } = req.user;
 
-  console.log(accessToken);
-
   try {
     const url =
       "https://fantasysports.yahooapis.com/fantasy/v2/users;use_login=1/games/leagues";
     const response = await fetchYahooData(url, accessToken);
     const leagues = parseLeaguesFromResponse(response);
+    console.log(leagues, "leagues Data");
 
     const leagueIds = await Promise.all(
       leagues.map(async (leagueData) => {
@@ -30,9 +29,6 @@ exports.getLeagues = async (req, res) => {
           leagueData.leagueKey,
           accessToken
         );
-
-        console.log(JSON.stringify(teamsData, null, 2), "teamsData");
-        console.log(JSON.stringify(draftData, null, 2), "draftData");
 
         // Handle single object or array for teams
         const teamsArray = teamsData?.fantasy_content?.league?.teams?.team

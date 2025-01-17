@@ -14,7 +14,6 @@ exports.fetchYahooGuid = async (accessToken) => {
         headers: { Authorization: `Bearer ${accessToken}` },
       }
     );
-    console.log("Yahoo GUID Response:", response.data);
     const parsedData = await parseXML(response.data);
     return parsedData?.fantasy_content?.users?.user?.guid || null;
   } catch (error) {

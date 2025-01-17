@@ -3,7 +3,6 @@ const OAuth2Strategy = require("passport-oauth2");
 const User = require("../models/User");
 const { fetchYahooGuid, fetchUserInfo } = require("../utils/yahooApi");
 
-console.log(process.env.CLIENT_SECRET);
 // Strategy configuration
 passport.use(
   "yahoo",
@@ -20,9 +19,6 @@ passport.use(
     },
     async (accessToken, refreshToken, params, profile, done) => {
       try {
-        console.log("Access Token:", accessToken);
-        console.log("Refresh Token:", refreshToken);
-        console.log("Params:", params);
         const userGuid = await fetchYahooGuid(accessToken);
         if (!userGuid) throw new Error("Yahoo GUID not found.");
 
