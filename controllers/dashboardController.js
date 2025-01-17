@@ -46,7 +46,10 @@ exports.getLeagues = async (req, res) => {
               accessToken
             );
 
-            console.log(rosterData, "rosterData");
+            console.log(
+              rosterData?.fantasy_content?.team?.roster,
+              "rosterData"
+            );
 
             // Handle player data
             const playersArray = rosterData?.fantasy_content?.team?.roster
@@ -59,11 +62,14 @@ exports.getLeagues = async (req, res) => {
               : [];
 
             return {
-              teamName: team.name,
-              wins: parseInt(team.number_of_moves) || 0,
-              losses: parseInt(team.number_of_trades) || 0,
+              teamKey: team.team_key,
+              teamName: team.name || "Unknown Team",
+              wins: parseInt(team.team_standings?.outcome_totals?.wins) || 0,
+              losses:
+                parseInt(team.team_standings?.outcome_totals?.losses) || 0,
               playoffQualified: team.clinched_playoffs === "1",
               players: playersArray.map((player) => ({
+                playerId: player.player_id,
                 name: player.name?.full || "Unknown Player",
                 pointsScored:
                   parseFloat(
@@ -73,15 +79,13 @@ exports.getLeagues = async (req, res) => {
                 waiverPickups:
                   parseInt(player.transaction_data?.waiver?.count) || 0,
                 draftRound: parseInt(player.draft_analysis?.round) || null,
-                injured:
-                  player.injury_status === "INJ" ||
-                  player.injury_status === "OUT",
+                injured: ["INJ", "OUT"].includes(player.injury_status),
               })),
             };
           })
         );
 
-        console.log(teams);
+        console.log(teams, "teams");
 
         // Handle single object or array for draft results
         const draftArray = draftData?.fantasy_content?.league?.draft_results
