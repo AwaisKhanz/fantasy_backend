@@ -47,8 +47,8 @@ exports.getLeagues = async (req, res) => {
             );
 
             console.log(
-              rosterData?.fantasy_content?.team?.roster,
-              "rosterData"
+              rosterData.fantasy_content.team.roster.players.player,
+              "players"
             );
 
             // Handle player data
@@ -98,6 +98,7 @@ exports.getLeagues = async (req, res) => {
           : [];
 
         const draftResults = draftArray.map((pick) => ({
+          playerId: pick.player_id || "unknown_player_id",
           name: pick.player_name || "Unknown Player",
           pointsScored:
             parseFloat(
