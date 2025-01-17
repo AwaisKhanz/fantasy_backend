@@ -37,6 +37,8 @@ exports.getLeagues = async (req, res) => {
             : [teamsData.fantasy_content.league.teams.team]
           : [];
 
+        console.log(teamsArray, "teamsArray");
+
         const teams = teamsArray.map((team) => ({
           teamName: team.name,
           wins: parseInt(team.team_standings?.outcome_totals?.wins) || 0,
