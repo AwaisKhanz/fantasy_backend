@@ -112,6 +112,16 @@ exports.fetchTeamRoster = async (teamKey, accessToken) => {
   return response;
 };
 
+exports.fetchPlayerStats = async (playerKey, accessToken) => {
+  const url = `https://fantasysports.yahooapis.com/fantasy/v2/player/${playerKey}/stats`;
+  return await fetchYahooData(url, accessToken);
+};
+
+exports.fetchLeagueTransactions = async (leagueKey, accessToken) => {
+  const url = `https://fantasysports.yahooapis.com/fantasy/v2/league/${leagueKey}/transactions`;
+  return await fetchYahooData(url, accessToken);
+};
+
 // Fetch player stats and team performance
 exports.fetchLeagueTeamsAndStats = async (leagueKey, accessToken) => {
   const url = `https://fantasysports.yahooapis.com/fantasy/v2/league/${leagueKey}/teams`;

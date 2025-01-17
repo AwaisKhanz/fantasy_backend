@@ -3,6 +3,8 @@ const {
   fetchLeagueTeamsAndStats,
   fetchDraftResults,
   parseLeaguesFromResponse,
+  fetchPlayerStats,
+  fetchLeagueTransactions,
 } = require("../utils/yahooApi");
 const League = require("../models/League");
 const { fetchTeamRoster } = require("../utils/yahooApi");
@@ -15,13 +17,11 @@ exports.getLeagues = async (req, res) => {
       "https://fantasysports.yahooapis.com/fantasy/v2/users;use_login=1/games/leagues";
     const response = await fetchYahooData(url, accessToken);
     const leagues = parseLeaguesFromResponse(response);
-    console.log(leagues, "leagues Data");
 
     const leagueIds = await Promise.all(
       leagues.map(async (leagueData) => {
         let league = await League.findOne({ leagueKey: leagueData.leagueKey });
 
-        // Fetch Teams and Draft Data
         const teamsData = await fetchLeagueTeamsAndStats(
           leagueData.leagueKey,
           accessToken
@@ -31,7 +31,11 @@ exports.getLeagues = async (req, res) => {
           accessToken
         );
 
-        // Handle single object or array for teams
+        const transactionsData = await fetchLeagueTransactions(
+          leagueData.leagueKey,
+          accessToken
+        );
+
         const teamsArray = teamsData?.fantasy_content?.league?.teams?.team
           ? Array.isArray(teamsData.fantasy_content.league.teams.team)
             ? teamsData.fantasy_content.league.teams.team
@@ -40,18 +44,11 @@ exports.getLeagues = async (req, res) => {
 
         const teams = await Promise.all(
           teamsArray.map(async (team) => {
-            // Fetch player roster for each team
             const rosterData = await fetchTeamRoster(
               team.team_key,
               accessToken
             );
 
-            console.log(
-              rosterData.fantasy_content.team.roster.players.player,
-              "players"
-            );
-
-            // Handle player data
             const playersArray = rosterData?.fantasy_content?.team?.roster
               ?.players?.player
               ? Array.isArray(
@@ -68,42 +65,61 @@ exports.getLeagues = async (req, res) => {
               losses:
                 parseInt(team.team_standings?.outcome_totals?.losses) || 0,
               playoffQualified: team.clinched_playoffs === "1",
-              players: playersArray.map((player) => ({
-                playerId: player.player_id,
-                name: player.name?.full || "Unknown Player",
-                pointsScored:
-                  parseFloat(
-                    player.player_stats?.stats?.find((s) => s.stat_id === "0")
-                      ?.value
-                  ) || 0,
-                waiverPickups:
-                  parseInt(player.transaction_data?.waiver?.count) || 0,
-                draftRound: parseInt(player.draft_analysis?.round) || null,
-                injured: ["INJ", "OUT"].includes(player.injury_status),
-              })),
+              players: await Promise.all(
+                playersArray.map(async (player) => {
+                  // 1. Fetch player stats
+                  const statsData = await fetchPlayerStats(
+                    player.player_key,
+                    accessToken
+                  );
+                  const pointsScored =
+                    parseFloat(
+                      statsData?.fantasy_content?.player?.player_stats?.stats?.find(
+                        (s) => s.stat_id === "0"
+                      )?.value
+                    ) || 0;
+
+                  // 2. Calculate waiver pickups from transaction data
+                  const waiverPickups =
+                    transactionsData?.fantasy_content?.league?.transactions?.transaction?.filter(
+                      (t) =>
+                        t.type === "add" &&
+                        t.players?.player?.player_id === player.player_id
+                    )?.length || 0;
+
+                  // 3. Find draft round from draft data
+                  const draftRound =
+                    draftData?.fantasy_content?.league?.draft_results?.draft_result?.find(
+                      (d) => d.player_id === player.player_id
+                    )?.round || null;
+
+                  // 4. Check if the player is injured
+                  const injured = ["INJ", "OUT"].includes(player.status);
+
+                  return {
+                    playerId: player.player_id,
+                    name: player.name?.full || "Unknown Player",
+                    pointsScored,
+                    waiverPickups,
+                    draftRound,
+                    injured,
+                  };
+                })
+              ),
             };
           })
         );
 
-        console.log(teams, "teams");
-
-        // Handle single object or array for draft results
         const draftArray = draftData?.fantasy_content?.league?.draft_results
           ?.draft_result
           ? Array.isArray(
               draftData.fantasy_content.league.draft_results.draft_result
             )
-            ? draftData.fantasy_content.league.draft_results.draft_result
-            : [draftData.fantasy_content.league.draft_results.draft_result]
-          : [];
+          : [draftData.fantasy_content.league.draft_results.draft_result];
 
         const draftResults = draftArray.map((pick) => ({
           playerId: pick.player_id || "unknown_player_id",
           name: pick.player_name || "Unknown Player",
-          pointsScored:
-            parseFloat(
-              pick.player_stats?.stats?.find((s) => s.stat_id === "0")?.value
-            ) || 0,
           draftRound: parseInt(pick.round) || null,
         }));
 
