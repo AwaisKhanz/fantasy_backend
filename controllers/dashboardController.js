@@ -5,6 +5,7 @@ const {
   parseLeaguesFromResponse,
 } = require("../utils/yahooApi");
 const League = require("../models/League");
+const { fetchTeamRoster } = require("../utils/yahooApi");
 
 exports.getLeagues = async (req, res) => {
   const { accessToken } = req.user;
@@ -37,32 +38,50 @@ exports.getLeagues = async (req, res) => {
             : [teamsData.fantasy_content.league.teams.team]
           : [];
 
-        console.log(teamsArray, "teamsArray");
+        const teams = await Promise.all(
+          teamsArray.map(async (team) => {
+            // Fetch player roster for each team
+            const rosterData = await fetchTeamRoster(
+              team.team_key,
+              accessToken
+            );
 
-        const teams = teamsArray.map((team) => ({
-          teamName: team.name,
-          wins: parseInt(team.team_standings?.outcome_totals?.wins) || 0,
-          losses: parseInt(team.team_standings?.outcome_totals?.losses) || 0,
-          playoffQualified: team.team_standings?.playoff_seed ? true : false,
-          players: (team.roster?.players?.player
-            ? Array.isArray(team.roster.players.player)
-              ? team.roster.players.player
-              : [team.roster.players.player]
-            : []
-          ).map((player) => ({
-            name: player.name?.full,
-            pointsScored:
-              parseFloat(
-                player.player_stats?.stats?.find((s) => s.stat_id === "0")
-                  ?.value
-              ) || 0,
-            waiverPickups:
-              parseInt(player.transaction_data?.waiver?.count) || 0,
-            draftRound: parseInt(player.draft_analysis?.round) || null,
-            injured:
-              player.injury_status === "INJ" || player.injury_status === "OUT",
-          })),
-        }));
+            console.log(rosterData, "rosterData");
+
+            // Handle player data
+            const playersArray = rosterData?.fantasy_content?.team?.roster
+              ?.players?.player
+              ? Array.isArray(
+                  rosterData.fantasy_content.team.roster.players.player
+                )
+                ? rosterData.fantasy_content.team.roster.players.player
+                : [rosterData.fantasy_content.team.roster.players.player]
+              : [];
+
+            return {
+              teamName: team.name,
+              wins: parseInt(team.number_of_moves) || 0,
+              losses: parseInt(team.number_of_trades) || 0,
+              playoffQualified: team.clinched_playoffs === "1",
+              players: playersArray.map((player) => ({
+                name: player.name?.full || "Unknown Player",
+                pointsScored:
+                  parseFloat(
+                    player.player_stats?.stats?.find((s) => s.stat_id === "0")
+                      ?.value
+                  ) || 0,
+                waiverPickups:
+                  parseInt(player.transaction_data?.waiver?.count) || 0,
+                draftRound: parseInt(player.draft_analysis?.round) || null,
+                injured:
+                  player.injury_status === "INJ" ||
+                  player.injury_status === "OUT",
+              })),
+            };
+          })
+        );
+
+        console.log(teams);
 
         // Handle single object or array for draft results
         const draftArray = draftData?.fantasy_content?.league?.draft_results

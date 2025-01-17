@@ -1,14 +1,16 @@
 const mongoose = require("mongoose");
 
 const playerSchema = new mongoose.Schema({
+  playerId: { type: String, required: true },
   name: { type: String, required: true },
   pointsScored: { type: Number, default: 0 },
   waiverPickups: { type: Number, default: 0 },
-  draftRound: { type: Number },
+  draftRound: { type: Number, default: null },
   injured: { type: Boolean, default: false },
 });
 
 const teamSchema = new mongoose.Schema({
+  teamKey: { type: String, required: true, unique: true },
   teamName: { type: String, required: true },
   wins: { type: Number, default: 0 },
   losses: { type: Number, default: 0 },
