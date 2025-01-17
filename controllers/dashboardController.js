@@ -117,7 +117,7 @@ exports.getLeagues = async (req, res) => {
             )
           : [draftData.fantasy_content.league.draft_results.draft_result];
 
-        const draftResults = draftArray.map((pick) => ({
+        const draftResults = draftArray?.map((pick) => ({
           playerId: pick.player_id || "unknown_player_id",
           name: pick.player_name || "Unknown Player",
           draftRound: parseInt(pick.round) || null,
