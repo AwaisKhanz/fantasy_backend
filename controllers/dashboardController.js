@@ -73,7 +73,7 @@ exports.getLeagues = async (req, res) => {
           : [];
 
         const draftResults = draftArray.map((pick) => ({
-          name: pick.player_name,
+          name: pick.player_name || "Unknown Player",
           pointsScored:
             parseFloat(
               pick.player_stats?.stats?.find((s) => s.stat_id === "0")?.value
